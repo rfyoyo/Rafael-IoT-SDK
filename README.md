@@ -5,10 +5,10 @@
 
     1. Dongle Board (Console :UART1/ EZMesh port :UART0)
 
-        `./en_zb_ncp rt582 evb`
+        `./en_zb_ncp rt582 dongle`
     2. EVK Board (Console :UART0/ EZMesh port :UART1)
 
-        `./en_zb_ncp rt582 evb`
+        `./en_zb_ncp rt582 dongle`
 
 * Only Bluetooth LE HCI + Openthread RCP
 `rm -rf build_out`

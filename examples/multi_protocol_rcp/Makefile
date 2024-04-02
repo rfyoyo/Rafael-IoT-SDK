@@ -1,0 +1,135 @@
+#
+# This is a project Makefile. It is assumed the directory this Makefile resides in is a
+# project subdirectory.
+#
+
+SOC_DRV = $(shell echo $(CONFIG_CHIP_NAME) | tr A-Z a-z)
+TARGET_BOARD = $(shell echo $(CONFIG_TARGET_BOARD) | tr A-Z a-z)
+
+PROJECT_PATH := $(abspath .)
+PROJECT_NAME :=  $(notdir $(PROJECT_PATH))
+PROJECT_BOARD := $(TARGET_BOARD)
+export PROJECT_PATH PROJECT_BOARD
+#CONFIG_TOOLPREFIX :=
+
+#-include ./proj_config.mk
+
+RAFAEL_IOT_SDK_PATH_GUESS ?= $(shell pwd)
+RAFAEL_IOT_SDK_PATH ?= $(RAFAEL_IOT_SDK_PATH_GUESS)/../..
+SOC_DRV = $(shell echo $(CONFIG_CHIP_NAME) | tr A-Z a-z)
+
+INCLUDE_COMPONENTS += $(PROJECT_NAME)
+INCLUDE_COMPONENTS += $(SOC_DRV)_$(PROJECT_BOARD) $(SOC_DRV)_driver $(SOC_DRV)_hosal $(SOC_DRV)_freertos $(SOC_DRV)_crypto
+INCLUDE_COMPONENTS += rt569_rf rt569mp ruci
+INCLUDE_COMPONENTS += uart_stdio newlibc utility EnhancedFlashDataset cli log
+INCLUDE_COMPONENTS += hci_bridge
+INCLUDE_COMPONENTS += cpc
+INCLUDE_COMPONENTS += lmac15p4 
+INCLUDE_COMPONENTS += openthread openthread_port
+
+
+ifeq ($(CONFIG_CPC_ENABLE_ZIGBEE_NCP), 1)
+INCLUDE_COMPONENTS += zboss zboss_port
+endif
+
+ifeq ("$(PROJECT_BOARD)", "dongle")
+    CPPFLAGS += -DCONFIG_UART_STDIO_PORT=1
+    CPPFLAGS += -DCONFIG_OPERATION_UART_PORT=0
+endif
+
+ifeq ("$(CONFIG_TARGET_CUSTOMER)", "amigo")
+    $(info ****** Amigo config ******** )
+    CPPFLAGS += -DCONFIG_UART_STDIO_PORT=0
+    CPPFLAGS += -DCONFIG_OPERATION_UART_PORT=1
+    CPPFLAGS += -DCPC_CRC_0=1
+    CPPFLAGS += -DCPC_OPERARION_UART_PIN_1=4
+    CPPFLAGS += -DCPC_OPERARION_UART_PIN_2=5
+    CPPFLAGS += -DCPC_OPERATION_BAUDRATE=115200
+    CPPFLAGS += -DCONFIG_TX_POWER_SET=1
+endif
+
+CPPFLAGS += -DCFG_CPC_ENABLE=1
+CPPFLAGS += -DOT_FREERTOS_ENABLE=1
+CPPFLAGS += -DOPENTHREAD_CONFIG_PLATFORM_INFO=\"RT582\"
+
+CPPFLAGS += -DOPENTHREAD_CONFIG_HEAP_EXTERNAL_ENABLE=1
+CPPFLAGS += -DOPENTHREAD_CONFIG_LOG_SUFFIX=\"\\r\\n\"
+
+OPENTHREAD_RADIO:=0
+ifeq ($(origin CONFIG_NCP), undefined)
+    CPPFLAGS += -DOPENTHREAD_RADIO=0
+    ifeq ($(CONFIG_FTD), 1)
+        CPPFLAGS += -DOPENTHREAD_FTD=1
+        CPPFLAGS += -DOPENTHREAD_MTD=0
+    else
+        CPPFLAGS += -DOPENTHREAD_FTD=0
+        CPPFLAGS += -DOPENTHREAD_MTD=1
+
+        CPPFLAGS += -DCONFIG_PP=${CONFIG_PP}
+    endif
+
+    CPPFLAGS += -DCONFIG_PREFIX=${CONFIG_PREFIX}
+
+    ifeq ($(origin CONFIG_OTDEMO), undefined)
+        #only cli command image
+        ifeq ($(CONFIG_FTD), 1)
+            # only build image with joiner and commissioner configuration for FTD device
+            CPPFLAGS += -DOPENTHREAD_CONFIG_COMMISSIONER_ENABLE=1
+            CPPFLAGS += -DOPENTHREAD_CONFIG_JOINER_ENABLE=1
+        else
+            # only build image with joiner configuration for MTD device
+            CPPFLAGS += -DOPENTHREAD_CONFIG_JOINER_ENABLE=1
+        endif
+    else
+        CPPFLAGS += -DCONFIG_OTDEMO=${CONFIG_OTDEMO}
+        ifeq (${CONFIG_OTDEMO}, 2)
+            # coap demo image
+            CPPFLAGS += -DOPENTHREAD_CONFIG_COAP_API_ENABLE=1
+        endif
+    endif
+else
+    CPPFLAGS += -DDISABLE_PRINT
+    CPPFLAGS += -DCONFIG_NCP=${CONFIG_NCP}
+    CPPFLAGS += -DOPENTHREAD_CONFIG_NCP_HDLC_ENABLE=0
+    CPPFLAGS += -DOPENTHREAD_ENABLE_NCP_SPINEL_ENCRYPTER=0
+
+    ifeq ($(CONFIG_NCP), 0)
+        OPENTHREAD_RADIO:=1
+        CPPFLAGS += -DOPENTHREAD_RADIO=1
+        CPPFLAGS += -DOPENTHREAD_FTD=0
+        CPPFLAGS += -DOPENTHREAD_MTD=0
+        CPPFLAGS += -DOPENTHREAD_SPINEL_CONFIG_OPENTHREAD_MESSAGE_ENABLE=0
+		CPPFLAGS += -DOPENTHREAD_CONFIG_NCP_CPC_ENABLE=1
+        CPPFLAGS += -DOPENTHREAD_CONFIG_MULTIPAN_RCP_ENABLE=1
+    else
+        CPPFLAGS += -DOPENTHREAD_RADIO=0
+        ifeq ($(CONFIG_FTD), 1)
+            CPPFLAGS += -DOPENTHREAD_FTD=1
+            CPPFLAGS += -DOPENTHREAD_MTD=0
+        else
+            CPPFLAGS += -DOPENTHREAD_FTD=0
+            CPPFLAGS += -DOPENTHREAD_MTD=1
+        endif
+
+    endif
+endif
+
+export OPENTHREAD_RADIO
+
+CPPFLAGS += -DOPENTHREAD_CONFIG_MLR_ENABLE=1
+
+CPPFLAGS += -DOPENTHREAD_CONFIG_TMF_NETDATA_SERVICE_ENABLE=0
+CPPFLAGS += -DOPENTHREAD_CONFIG_SRP_SERVER_ENABLE=0
+
+CPPFLAGS += -DOPENTHREAD_CONFIG_BORDER_ROUTER_ENABLE=0
+CPPFLAGS += -DOPENTHREAD_CONFIG_BACKBONE_ROUTER_ENABLE=0
+
+CPPFLAGS += -DCONFIG_OT_ASSERT
+CPPFLAGS += -DCFG_CPP_ENABLE=1
+
+include $(RAFAEL_IOT_SDK_PATH)/make_scripts/project.mk
+
+EXTRA_LDFLAGS += -Wl,--print-memory-usage
+ifdef CONFIG_CACHE_SIZE
+EXTRA_LDFLAGS += -Wl,--defsym=__CACHE_SIZE=$(CONFIG_CACHE_SIZE)
+endif

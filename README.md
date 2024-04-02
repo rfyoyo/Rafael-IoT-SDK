@@ -1,6 +1,7 @@
 # How to Build
 `cd examples/multi_protocol_rcp`
 * Enable Zigbee Gateway NCP + Bluetooth LE HCI + Openthread RCP
+
 `rm -rf build_out`
 
     1. Dongle Board (Console :UART1/ EZMesh port :UART0)
@@ -11,6 +12,7 @@
         `./en_zb_ncp rt582 dongle`
 
 * Only Bluetooth LE HCI + Openthread RCP
+
 `rm -rf build_out`
 
     1. Dongle Board (Console :UART1/ EZMesh port :UART0)

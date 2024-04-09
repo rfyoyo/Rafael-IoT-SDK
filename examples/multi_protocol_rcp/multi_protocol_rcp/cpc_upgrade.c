@@ -114,6 +114,8 @@ static void upgrade_cpc_tx_callback(cpc_user_endpoint_id_t endpoint_id, void *bu
     (void)endpoint_id;
     (void)buffer;
     (void)arg;
+    if(arg)
+        vPortFree(arg);
     CPC_UPG_NOTIFY(CPC_UPG_EVENT_CPC_WRITE_DONE);
 }
 
@@ -221,11 +223,12 @@ void upgrade_cmd_send(uint32_t cmd_id, uint16_t addr, uint8_t addr_mode, uint8_t
         ((gateway_cmd_end *)(&gateway_cmd_pkt[idx]))->cs = upgrade_cmd_checksum_calc((uint8_t *) & (((gateway_cmd_hdr *)(gateway_cmd_pkt))->len),
                 ((gateway_cmd_hdr *)(gateway_cmd_pkt))->len + 1);
 
-        status = cpc_write(&upgrade_endpoint_handle, gateway_cmd_pkt, pkt_len, 0, NULL);
+        status = cpc_write(&upgrade_endpoint_handle, gateway_cmd_pkt, pkt_len, 0, gateway_cmd_pkt);
 
         if(status != STATUS_OK)
         {
             log_error("UPG Tx fail (%X)!\n", status);
+	    vPortFree(gateway_cmd_pkt);
         }
         else
         {
@@ -233,7 +236,6 @@ void upgrade_cmd_send(uint32_t cmd_id, uint16_t addr, uint8_t addr_mode, uint8_t
             log_debug("------------------------      UPG >>>> ------------------------");
             log_debug_hexdump("UTX", gateway_cmd_pkt, pkt_len);        
         }
-        vPortFree(gateway_cmd_pkt);
 
     } while (0);
 

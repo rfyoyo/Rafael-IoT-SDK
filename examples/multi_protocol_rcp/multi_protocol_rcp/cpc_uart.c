@@ -50,7 +50,7 @@
 #endif // !CPC_OPERARION_UART_PIN_1
 
 #ifndef CPC_OPERATION_BAUDRATE
-#define CPC_OPERATION_BAUDRATE 115200
+#define CPC_OPERATION_BAUDRATE 2000000
 #endif // !CPC_OPERARION_UART_PIN_1
 
 #if (CPC_OPERATION_BAUDRATE == 115200)
@@ -212,10 +212,9 @@ static void __cpc_uart_signal(void)
 static void _uart_tx_done_pend_cb(void *pvParameter1, uint32_t ulParameter2)
 {
     g_uart_tx_compelete = 1;
-
-    enter_critical_section();
+    // enter_critical_section();
     cpc_drv_trnsmit_complete();
-    leave_critical_section();
+    // leave_critical_section();
     gpio_pin_set(20);
     CPC_UART_NOTIFY(CPC_UART_EVENT_TRIGGER);
 }
@@ -232,7 +231,7 @@ static int __uart_tx_callback(void *p_arg)
     return 0;
 }
 
-static int __uart_rx_callback(void *p_arg)
+static int __reloc __uart_rx_callback(void *p_arg)
 {
     int cnt = 0;
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -242,10 +241,11 @@ static int __uart_rx_callback(void *p_arg)
     if(cnt > 0)
     {
         xStreamBufferSendFromISR(xStreamBuffer, g_rx_buf, cnt, &xHigherPriorityTaskWoken);
-
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-        CPC_UART_NOTIFY_ISR(CPC_UART_EVENT_TRIGGER);
     }
+    CPC_UART_NOTIFY_ISR(CPC_UART_EVENT_TRIGGER);
+
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+
     return 0;
 }
 extern uint32_t cpc_drv_uart_push_header(uint8_t *pHeader);
@@ -270,26 +270,28 @@ static uint32_t __cpc_hdlc_pkt_parser(uint8_t *pBuf, uint16_t plen)
         {
             if ((plen - i) < CPC_HDLC_HEADER_RAW_SIZE) 
             {
-                u32_len = i;
+                u32_len += i;
                 goto exit;
             }
 
             hdr = (cpc_uart_pkt_hdr *)(pBuf + i);
             if(hdr->len > CPC_RX_PAYLOAD_MAX_LENGTH || hdr->ep > 100)
             {
+                //log_warn("epkt");
                 continue;
             }
 
             /* Check header crc */
             if (!cpc_validate_crc_sw((pBuf + i), CPC_HDLC_HEADER_SIZE, hdr->hcs))
             {
+                //log_warn("ehcrc");
                 continue;
             }
 
             if ((plen - i) < (CPC_HDLC_HEADER_RAW_SIZE + hdr->len)) 
             {
                 /* Wait HDLC data */
-                u32_len = i;
+                u32_len += i;
                 goto exit;
             }
             if(hdr->len == 0)
@@ -313,12 +315,15 @@ static uint32_t __cpc_hdlc_pkt_parser(uint8_t *pBuf, uint16_t plen)
                     cpc_drv_uart_push_data(hdr->data , hdr->len);
                 }
             }
-            u32_len = i + CPC_HDLC_HEADER_RAW_SIZE + hdr->len;
-            goto exit;
+            u32_len += i + CPC_HDLC_HEADER_RAW_SIZE + hdr->len;
+            i +=  CPC_HDLC_HEADER_RAW_SIZE + hdr->len;
+        }
+        else
+        {
+            u32_len+=i;
         }
     }
-    /* HDLC flag not found */
-    u32_len = plen;
+
     exit:
     return u32_len;
 }
@@ -335,7 +340,6 @@ static void _uart_proces(uint8_t *packet, uint16_t *packet_length)
     {
         if(xQueueReceive(cpc_uart_handle, (void*)&uart_data, 0) == pdPASS)
         {
-            gpio_pin_clear(20);
             g_uart_tx_compelete = 0;
             buffer_handle = (cpc_buffer_handle_t *)uart_data.pdata;
             if (uart_data.dlen > 0)
@@ -353,8 +357,8 @@ static void _uart_proces(uint8_t *packet, uint16_t *packet_length)
                 txdam_cfg.dma_buf_size = CPC_HDLC_HEADER_RAW_SIZE;
                 memcpy(txdam_cfg.dma_buf, buffer_handle->hdlc_header, CPC_HDLC_HEADER_RAW_SIZE);
             }
-
             hosal_uart_ioctl(&cpc_uart_dev, HOSAL_UART_DMA_TX_START, &txdam_cfg);
+            gpio_pin_clear(20);
         }
     }
 
@@ -363,10 +367,12 @@ static void _uart_proces(uint8_t *packet, uint16_t *packet_length)
     xReceivedBytes = xStreamBufferReceive(xStreamBuffer, 
                                           &packet[*packet_length], 
                                           (CPC_UART_CACHE_BUFFER_SIZE - *packet_length), 
-                                          0);
+                                          1);
+                                          
 
     if(xReceivedBytes > 0)
     {
+        // log_info_hexdump("",  &packet[*packet_length], xReceivedBytes);
         *packet_length += xReceivedBytes;
 
         /* Sepcial pattern for reset */
@@ -381,9 +387,9 @@ static void _uart_proces(uint8_t *packet, uint16_t *packet_length)
         offset = __cpc_hdlc_pkt_parser(packet, *packet_length);
         if(offset > 0 )
         {
-            if(*packet_length >= offset)
+            if(*packet_length > offset)
             {
-                memmove(packet, (packet + offset), (*packet_length - offset));   
+                memmove(packet, (packet + offset), (*packet_length - offset));
             }
             else
             {
@@ -415,7 +421,8 @@ static void _uart_task(void *parameters_ptr)
         CPC_UART_GET_NOTIFY(sevent);
 
         _uart_proces(uart_packet, &uart_packet_length);
-        ulTaskNotifyTake(pdTRUE, 2);
+        // ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        ulTaskNotifyTake(pdTRUE, 1);
     }
 }
 
@@ -456,7 +463,7 @@ int cpc_uart_data_send(cpc_buffer_handle_t *buffer_handle, uint16_t payload_tx_l
         cpc_drv_trnsmit_complete();
         leave_critical_section();
 
-        return 0;
+        return;
     }
 
     if(xQueueSend(cpc_uart_handle, (void *)&uart_data, portMAX_DELAY) != pdPASS)
@@ -493,6 +500,7 @@ void cpc_uart_init(void)
     s15p4tx_timer = xTimerCreate("15p4_T", 10, true, NULL, __15p4_tx_cb);
 
     gpio_cfg_output(20);
+    gpio_cfg_output(21);
 
     xStreamBuffer = xStreamBufferCreate(CPC_UART_RAW_BUFFER_SIZE, 1);
 

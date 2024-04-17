@@ -32,6 +32,7 @@ extern "C"
 #define SUPPORT_15P4                (1)
 #define RFB_ZIGBEE_ENABLED          (1)
 #define RFB_MULTI_ENABLED           (1)
+#define RF_MCU_CONST_LOAD_SUPPORTED (0x01)
 #endif
 
 #if  MODULE_ENABLE(RF_FW_INCLUDE_BLE)

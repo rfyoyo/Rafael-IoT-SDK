@@ -116,6 +116,7 @@ static void upgrade_cpc_tx_callback(cpc_user_endpoint_id_t endpoint_id, void *bu
     (void)arg;
     if(arg)
         vPortFree(arg);
+
     CPC_UPG_NOTIFY(CPC_UPG_EVENT_CPC_WRITE_DONE);
 }
 
@@ -228,7 +229,7 @@ void upgrade_cmd_send(uint32_t cmd_id, uint16_t addr, uint8_t addr_mode, uint8_t
         if(status != STATUS_OK)
         {
             log_error("UPG Tx fail (%X)!\n", status);
-	    vPortFree(gateway_cmd_pkt);
+            vPortFree(gateway_cmd_pkt);
         }
         else
         {
@@ -236,7 +237,6 @@ void upgrade_cmd_send(uint32_t cmd_id, uint16_t addr, uint8_t addr_mode, uint8_t
             log_debug("------------------------      UPG >>>> ------------------------");
             log_debug_hexdump("UTX", gateway_cmd_pkt, pkt_len);        
         }
-
     } while (0);
 
 }
@@ -498,7 +498,10 @@ static void upgrade_cmd_handle(uint32_t cmd_id, uint8_t *pBuf)
             }
 
             if(g_op_flash == 0)
-                upgrade_cmd_send(0xF0008001, 0, 0, 0, (uint8_t *)&status, 4);            
+            {
+                vTaskDelay(1);
+                upgrade_cmd_send(0xF0008001, 0, 0, 0, (uint8_t *)&status, 4);
+            }
         }
         else
         {
@@ -638,9 +641,7 @@ void cpc_upgrade_init(void)
     enter_critical_section();
     while (flash_check_busy());
     if(flash_erase(FLASH_ERASE_SECTOR, FOTA_UPDATE_BANK_INFO_ADDRESS) != STATUS_SUCCESS)
-    {
         log_error("erase fail");
-    }
     while (flash_check_busy());
     leave_critical_section(); 
 

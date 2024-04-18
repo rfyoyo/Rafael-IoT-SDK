@@ -212,9 +212,9 @@ static void __cpc_uart_signal(void)
 static void _uart_tx_done_pend_cb(void *pvParameter1, uint32_t ulParameter2)
 {
     g_uart_tx_compelete = 1;
-    // enter_critical_section();
+    enter_critical_section();
     cpc_drv_trnsmit_complete();
-    // leave_critical_section();
+    leave_critical_section();
     gpio_pin_set(20);
     CPC_UART_NOTIFY(CPC_UART_EVENT_TRIGGER);
 }
@@ -270,7 +270,7 @@ static uint32_t __cpc_hdlc_pkt_parser(uint8_t *pBuf, uint16_t plen)
         {
             if ((plen - i) < CPC_HDLC_HEADER_RAW_SIZE) 
             {
-                u32_len += i;
+                u32_len = i;
                 goto exit;
             }
 
@@ -291,7 +291,7 @@ static uint32_t __cpc_hdlc_pkt_parser(uint8_t *pBuf, uint16_t plen)
             if ((plen - i) < (CPC_HDLC_HEADER_RAW_SIZE + hdr->len)) 
             {
                 /* Wait HDLC data */
-                u32_len += i;
+                u32_len = i;
                 goto exit;
             }
             if(hdr->len == 0)
@@ -315,12 +315,12 @@ static uint32_t __cpc_hdlc_pkt_parser(uint8_t *pBuf, uint16_t plen)
                     cpc_drv_uart_push_data(hdr->data , hdr->len);
                 }
             }
-            u32_len += i + CPC_HDLC_HEADER_RAW_SIZE + hdr->len;
+            u32_len = i + CPC_HDLC_HEADER_RAW_SIZE + hdr->len;
             i +=  CPC_HDLC_HEADER_RAW_SIZE + hdr->len;
         }
         else
         {
-            u32_len+=i;
+            u32_len=i;
         }
     }
 
@@ -385,6 +385,7 @@ static void _uart_proces(uint8_t *packet, uint16_t *packet_length)
         //     }
         // }
         offset = __cpc_hdlc_pkt_parser(packet, *packet_length);
+
         if(offset > 0 )
         {
             if(*packet_length > offset)

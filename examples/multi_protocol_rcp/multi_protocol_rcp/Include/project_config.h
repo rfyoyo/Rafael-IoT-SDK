@@ -23,6 +23,7 @@ extern "C"
 
 
 #define SET_SYS_CLK    SYS_CLK_64MHZ
+
 #define RF_FW_INCLUDE_PCI           (0)
 #define RF_FW_INCLUDE_BLE           (0)
 #define RF_FW_INCLUDE_MULTI_2P4G    (1)
@@ -30,7 +31,7 @@ extern "C"
 #if  MODULE_ENABLE(RF_FW_INCLUDE_MULTI_2P4G)
 #define SUPPORT_BLE                 (1)
 #define SUPPORT_15P4                (1)
-#define RFB_ZIGBEE_ENABLED          (1)
+#define RFB_ZIGBEE_ENABLED          (0)
 #define RFB_MULTI_ENABLED           (1)
 #define RF_MCU_CONST_LOAD_SUPPORTED (0x01)
 #endif
@@ -45,7 +46,7 @@ extern "C"
 #if  MODULE_ENABLE(RF_FW_INCLUDE_PCI)
 #define SUPPORT_BLE                 (0)
 #define SUPPORT_15P4                (1)
-#define RFB_ZIGBEE_ENABLED          (1)
+#define RFB_ZIGBEE_ENABLED          (0)
 #define RFB_MULTI_ENABLED           (0)
 #endif
 

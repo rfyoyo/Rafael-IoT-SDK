@@ -63,7 +63,7 @@ HOSAL_UART_DEV_DECL(cpc_uart_dev, CONFIG_OPERATION_UART_PORT, CPC_OPERARION_UART
 HOSAL_UART_DEV_DECL(cpc_uart_dev, CONFIG_OPERATION_UART_PORT, CPC_OPERARION_UART_PIN_1, CPC_OPERARION_UART_PIN_2, UART_BAUDRATE_2000000)
 #endif // 0
 
-#define CPC_UART_NOTIFY_ISR(ebit)                 (g_cpc_uart_evt_var |= ebit); __cpc_uart_signal()
+#define CPC_UART_NOTIFY_ISR(ebit)                 (g_cpc_uart_evt_var |= ebit); //__cpc_uart_signal()
 #define CPC_UART_NOTIFY(ebit)                     enter_critical_section(); g_cpc_uart_evt_var |= ebit; leave_critical_section(); __cpc_uart_signal()
 #define CPC_UART_GET_NOTIFY(ebit)                 enter_critical_section(); ebit = g_cpc_uart_evt_var; g_cpc_uart_evt_var = CPC_UART_EVENT_NONE; leave_critical_section()
 //=============================================================================
@@ -116,7 +116,7 @@ typedef struct
 //                  Global Data Definition
 //=============================================================================
 static int _cli_15p4_tx(int argc, char **argv, cb_shell_out_t log_out, void *pExtra);
-
+static int _cli_2chscan_en(int argc, char **argv, cb_shell_out_t log_out, void *pExtra);
 extern void cpc_drv_uart_loop(void);
 extern void cpc_drv_trnsmit_complete(void);
 static TaskHandle_t uart_taskHandle = NULL;
@@ -146,9 +146,39 @@ static sh_cmd_t  g_cli_cmd_15p4_tx =
     "    e.g. 15p4tx 2405 10",
 };
 
+static sh_cmd_t  g_cli_cmd_2chscan_en =
+{
+    .pCmd_name      = "2chscan",
+    .cmd_exec       = _cli_2chscan_en,
+    .pDescription   = "2chscan\n"
+    "  usage: 2chscan [ch1] [ch2] [enable] \n"
+    "    e.g. 2chscan 11 ~ 25 11 ~  25 1/0",
+};
+
+
 //=============================================================================
 //                  Private Function Definition
 //=============================================================================
+static int _cli_2chscan_en(int argc, char **argv, cb_shell_out_t log_out, void *pExtra)
+{
+    uint8_t ch1, ch2, en;
+    do
+    {
+        if ((argc < 3))
+        {
+            break;
+        }
+
+        ch1 = utility_strtol(argv[1], 0);
+        ch2 = utility_strtol(argv[2], 0);
+        en = utility_strtol(argv[3], 0);
+
+        log_info("%s 2 channel scan(%d, %d)", (en? "enable":"disable"), ch1, ch2);
+
+        lmac15p4_2ch_scan_set(en, ch1-11, ch2-11);
+    } while (0);
+    return 0;
+}
 static int _cli_15p4_tx(int argc, char **argv, cb_shell_out_t log_out, void *pExtra)
 {
     uint32_t freq ; 
@@ -199,15 +229,15 @@ static void __15p4_tx_cb(TimerHandle_t xTimer)
 
 static void __cpc_uart_signal(void)
 {
-    if (xPortIsInsideInterrupt())
-    {
-        BaseType_t pxHigherPriorityTaskWoken = pdTRUE;
-        vTaskNotifyGiveFromISR( uart_taskHandle, &pxHigherPriorityTaskWoken);
-    }
-    else
-    {
-        xTaskNotifyGive(uart_taskHandle);
-    }
+    // if (xPortIsInsideInterrupt())
+    // {
+    //     BaseType_t pxHigherPriorityTaskWoken = pdTRUE;
+    //     vTaskNotifyGiveFromISR( uart_taskHandle, &pxHigherPriorityTaskWoken);
+    // }
+    // else
+    // {
+    //     //xTaskNotifyGive(uart_taskHandle);
+    // }
 }
 static void _uart_tx_done_pend_cb(void *pvParameter1, uint32_t ulParameter2)
 {
@@ -498,6 +528,8 @@ void cpc_uart_init(void)
     hosal_uart_init(&cpc_uart_dev);
 
     shell_register_cmd(&g_cli_cmd_15p4_tx);
+    shell_register_cmd(&g_cli_cmd_2chscan_en);
+
     s15p4tx_timer = xTimerCreate("15p4_T", 10, true, NULL, __15p4_tx_cb);
 
     gpio_cfg_output(20);

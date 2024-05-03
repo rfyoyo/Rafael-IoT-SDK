@@ -101,15 +101,14 @@ static void __cpc_zb_ep_init(void)
 {
     uint32_t  status;
     status = cpc_open_service_endpoint(&cpc_zb_ep_handle, CPC_ENDPOINT_ZIGBEE, 0, 1);
+    if(status == 0)
+        log_info("Opened ZigBee NCP EP");
 
     status = cpc_set_endpoint_option(&cpc_zb_ep_handle, CPC_ENDPOINT_ON_IFRAME_WRITE_COMPLETED, (void *)__cpc_zb_write_done_evt);
 
     status = cpc_set_endpoint_option(&cpc_zb_ep_handle, CPC_ENDPOINT_ON_IFRAME_RECEIVE, (void *)__cpc_zb_read_evt);
 
     status = cpc_set_endpoint_option(&cpc_zb_ep_handle, CPC_ENDPOINT_ON_ERROR, (void*)__cpc_zb_error_evt);
-
-    if(status == 0)
-        log_info("cpc zb ep init success");
 }
 
 void zigbee_app_read_otp_mac_addr(uint8_t *addr)
@@ -244,12 +243,31 @@ void zigbee_app_nwk_start(uint32_t channel_mask, uint32_t max_child,
 
     zb_set_long_address(ieeeAddr);
 
-    zb_set_nvram_erase_at_start(reset);    
+    zb_set_nvram_erase_at_start(reset);
     zb_set_network_coordinator_role(ZIGBEE_CHANNEL_MASK(channel_mask));
     zb_set_max_children(max_child);
     zb_set_pan_id(panId);
     zb_zdo_set_aps_unsecure_join(ZB_TRUE);
     zb_bdb_set_legacy_device_support(ZB_TRUE);
+
+    OT_THREAD_SAFE(
+        otInstance *instance = otrGetInstance();
+
+        if(otLinkRawIsEnabled(instance))
+        {
+            log_info("Thread radion enabled, Enable 2 channel scan (%d, %d)", otLinkGetChannel(instance), channel_mask);
+
+            lmac15p4_auto_state_set(false);
+
+            otLinkGetChannel(instance);
+
+            lmac15p4_2ch_scan_set(true, (otLinkGetChannel(instance)-11), (channel_mask-11));
+        }
+        else
+        {
+            lmac15p4_2ch_scan_set(false, 0, (channel_mask-11));
+        }
+    )
 
     zbStartRun();
 }   
@@ -516,7 +534,7 @@ void zigbee_app_init(void)
         zb_zdo_register_device_annce_cb(dev_annce_cb);
     )
 
-    // zigbee_cli_init();
+    zigbee_cli_init();
     zigbee_gw_init(zb_app_handle);
 }
 #endif

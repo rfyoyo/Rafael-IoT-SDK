@@ -24,11 +24,11 @@
 #define PHY_PIB_CCA_THRESHOLD 75
 #define MAC_PIB_UNIT_BACKOFF_PERIOD 320
 #define MAC_PIB_MAC_ACK_WAIT_DURATION 544 // non-beacon mode; 864 for beacon mode
-#define MAC_PIB_MAC_MAX_BE 8
+#define MAC_PIB_MAC_MAX_BE 5
 #define MAC_PIB_MAC_MAX_FRAME_TOTAL_WAIT_TIME 16416
 #define MAC_PIB_MAC_MAX_FRAME_RETRIES 4
 #define MAC_PIB_MAC_MAX_CSMACA_BACKOFFS 10
-#define MAC_PIB_MAC_MIN_BE 3
+#define MAC_PIB_MAC_MIN_BE 2
 
 static uint32_t s_reboot_flag = 0;
 extern hosal_uart_dev_t cpc_uart_dev;
@@ -84,15 +84,16 @@ int main(void)
 
     init_wdt_init();
     log_init();
-    cli_init();
 
     hosal_rf_init(HOSAL_RF_MODE_MULTI_PROTOCOL);
+    lmac15p4_init(LMAC15P4_2P4G_OQPSK);
 
     cpc_uart_init();
+
+    cli_init();
+
     cpc_hci_init();
     cpc_upgrade_init();
-
-    lmac15p4_init(LMAC15P4_2P4G_OQPSK);
 
     pta_ctrl.enable = 0;
     pta_ctrl.inverse = 1;

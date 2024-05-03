@@ -124,6 +124,8 @@ static void __cpc_hci_ep_init(void)
 {
     uint32_t  status;
     status = cpc_open_service_endpoint(&cpc_hci_ep_handle, CPC_ENDPOINT_BLUETOOTH_RCP, 0, 10);
+    if(status == 0)
+        log_info("Opened bluetooth controller EP");
 
     status = cpc_set_endpoint_option(&cpc_hci_ep_handle, CPC_ENDPOINT_ON_IFRAME_WRITE_COMPLETED, (void *)__cpc_hci_write_done_evt);
 
@@ -440,45 +442,10 @@ static int __hci_data_cb(uint8_t *p_data, uint16_t data_len)
 static void __cpc_hci_task(void *parameters_ptr)
 {
     cpc_hci_event_t sevent = CPC_HCI_EVENT_NONE;
-
-    for (;;)
-    {
-        CPC_HCI_GET_NOTIFY(sevent);
-        __cpc_hci_ep_proc(sevent);
-
-        ulTaskNotifyTake(pdTRUE, 2);
-    }
-}
-
-// static void scan_100msTimerCallback( TimerHandle_t xTimer ) 
-// {
-//     log_warn("500 ms no adv report !");
-// }
-
-/**************************************************************************************************
- *    GLOBAL FUNCTIONS
- *************************************************************************************************/
-void cpc_hci_init(void)
-{
-    BaseType_t xReturned;
     uint8_t   *p_read_param;
     uint8_t   *p_cmp;
     uint8_t   _waddr = 1;
-    uint8_t hci_set_addr[] = {0x01, 0x01, 0xFC, 0x09, 0x00, 0xF7, 0x00, 0x00, 0x4C, 0xC1, 0x0B, 0x64, 0x08};
-
-    hci_bridge_init();
-
-    hci_bridge_callback_set(HIC_BRIDGE_CALLBACK_TYPE_EVENT, __hci_evt_cb);
-    hci_bridge_callback_set(HIC_BRIDGE_CALLBACK_TYPE_DATA, __hci_data_cb);    
-
-    cpc_hci_handle = xQueueCreate(64, sizeof(_cpc_hci_data_t *));
-
-    xReturned = xTaskCreate(__cpc_hci_task, "HCI_CPC", 512, NULL, configMAX_PRIORITIES - 6, &cpc_hci_taskHandle);
-    if( xReturned != pdPASS )
-    {
-        log_error("HCI_CPC create fail");
-    }
-
+    uint8_t hci_set_addr[] = {0x01, 0x01, 0xFC, 0x09, 0x00, 0xF7, 0x00, 0x00, 0x4C, 0xC1, 0x0B, 0x64, 0x08};    
     __cpc_hci_ep_init();
 
     p_read_param = pvPortMalloc(256);
@@ -512,5 +479,38 @@ void cpc_hci_init(void)
             }
         }
         vPortFree(p_read_param);     
+    }
+    for (;;)
+    {
+        CPC_HCI_GET_NOTIFY(sevent);
+        __cpc_hci_ep_proc(sevent);
+
+        ulTaskNotifyTake(pdTRUE, 2);
+    }
+}
+
+// static void scan_100msTimerCallback( TimerHandle_t xTimer ) 
+// {
+//     log_warn("500 ms no adv report !");
+// }
+
+/**************************************************************************************************
+ *    GLOBAL FUNCTIONS
+ *************************************************************************************************/
+void cpc_hci_init(void)
+{
+    BaseType_t xReturned;
+
+    hci_bridge_init();
+
+    hci_bridge_callback_set(HIC_BRIDGE_CALLBACK_TYPE_EVENT, __hci_evt_cb);
+    hci_bridge_callback_set(HIC_BRIDGE_CALLBACK_TYPE_DATA, __hci_data_cb);    
+
+    cpc_hci_handle = xQueueCreate(64, sizeof(_cpc_hci_data_t *));
+
+    xReturned = xTaskCreate(__cpc_hci_task, "HCI_CPC", 512, NULL, configMAX_PRIORITIES - 6, &cpc_hci_taskHandle);
+    if( xReturned != pdPASS )
+    {
+        log_error("HCI_CPC create fail");
     }
 }

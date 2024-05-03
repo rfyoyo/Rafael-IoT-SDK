@@ -91,7 +91,7 @@ static uint8_t *gp_ota_imgae_cache = NULL;
 static fota_information_t t_bootloader_ota_info = {0};
 static uint32_t g_download_complete = 0;
 static StreamBufferHandle_t xStreamBuffer;
-static volatile g_last_pkt = 0, g_file_idx = 0, g_op_flash = 0;
+static volatile uint32_t g_last_pkt = 0, g_file_idx = 0, g_op_flash = 0;
 static uint32_t g_op_flash_addr = FOTA_UPDATE_BUFFER_FW_ADDRESS_1MB_UNCOMPRESS;
 //=============================================================================
 //                  Private Function Definition

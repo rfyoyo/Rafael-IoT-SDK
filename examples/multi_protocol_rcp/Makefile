@@ -41,6 +41,8 @@ endif
 
 ifeq ("$(CONFIG_TARGET_CUSTOMER)", "amigo")
     $(info ****** Amigo config ******** )
+    CONFIG_CPC_CRC_0:= 1
+    export CONFIG_CPC_CRC_0
     CPPFLAGS += -DCONFIG_UART_STDIO_PORT=0
     CPPFLAGS += -DCONFIG_OPERATION_UART_PORT=1
     CPPFLAGS += -DCPC_CRC_0=1

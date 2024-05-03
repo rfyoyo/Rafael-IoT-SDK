@@ -81,5 +81,5 @@ void lmac15p4_csl_uncertainty_get(uint8_t *csl_uncertainty);
 void lmac15p4_csl_sample_time_update(uint32_t csl_sample_time);
 void lmac15p4_read_ack(uint8_t *ack_data, uint8_t *ack_time);
 void lmac15p4_key_set(uint32_t pan_idx, uint8_t *key);
-
+void lmac15p4_2ch_scan_set(uint32_t eanble, lmac154_channel_t ch1, lmac154_channel_t ch2);
 #endif

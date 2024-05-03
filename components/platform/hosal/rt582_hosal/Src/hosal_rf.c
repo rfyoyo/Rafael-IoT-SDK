@@ -63,7 +63,48 @@ static hosal_rf_callback_t g_pci_rx_done_cb = NULL;
 static hosal_rf_callback_t g_pci_tx_done_cb = NULL;
 static hosal_rf_callback_t g_hci_evt_cb = NULL;
 static hosal_rf_callback_t g_hci_data_cb = NULL;
-
+const uint8_t * g_rf_ctl_name_tbl[] = 
+{
+    "MODEM_SET",
+    "MODEM_GET",
+    "FREQ_SET",
+    "FREQ_GET",
+    "TX_CONTINOUS_SET",
+    "TX_START",
+    "TX_PWR_COMP",
+    "TX_PWR_CH_COMP",
+    "COMP_SEG",
+    "RSSI_GET",
+    "KEY_SET",
+    "SLEEP_SET",
+    "IDLE_SET",
+    "PTA_CTRL",
+    "15P4_MAC_PIB",
+    "15P4_PHY_PIB",
+    "15P4_ADDRESS_FILTER",
+    "15P4_AUTO_ACK",
+    "15P4_AUTO_STATE",
+    "15P4_ACK_PENDING_BIT",
+    "15P4_ACK_PACKET_GET",
+    "15P4_SRC_ADDR",
+    "15P4_SRC_ADDR",
+    "15P4_SRC_ADDR",
+    "15P4_CSL",
+    "15P4_CSL",
+    "15P4_CSL",
+    "15P4_CSL",
+    "15P4_OP_PAN_IDX",
+    "15P4_2CH_SCAN",
+    "15P4_RX_D_CH",
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+};
 /**************************************************************************************************
  *    EXTERN
  *************************************************************************************************/
@@ -206,13 +247,8 @@ static void __rf_check_state(void)
         case HOSAL_RF_NO_STS:
             break;
         case HOSAL_RF_EVENT_STS:
-            if(g_take_taskHandle != NULL)
-            {                
-                g_take_taskHandle = NULL;
-                xSemaphoreGive(xSemaphore);
-            }
             event_len = RfMcu_EvtQueueRead(g_event_buffer, &rxCmdError);
-
+            xSemaphoreGive(xSemaphore);
             evt_ptr = pvPortMalloc(event_len);
 
             if(evt_ptr)
@@ -230,6 +266,11 @@ static void __rf_check_state(void)
                     vPortFree(evt_ptr);
                 }
             }
+            // if(g_take_taskHandle != NULL)
+            // {                
+            //     g_take_taskHandle = NULL;
+            //     xSemaphoreGive(xSemaphore);
+            // }            
             break;
         case HOSAL_RF_RX_DATA_STS:
             event_len = RfMcu_RxQueueRead(g_rx_data, &rx_queue_error);
@@ -338,7 +379,40 @@ static hosal_rf_status_t __rf_15p4_src_match_short_entry(hosal_rf_15p4_src_match
     
     return rval;    
 }
+static hosal_rf_status_t __rf_15p4_2ch_scan_frequency_set(hosal_rf_15p4_2ch_scan_frequency_t *p_freq)
+{
+    hosal_rf_status_t rval = HOSAL_RF_STATUS_SUCCESS;
+    uint8_t cmd_ptr[RUCI_LEN_SET_2CH_SCAN_FREQUENCY];
+    ruci_para_cnf_event_t sCnfEvent = {0};
 
+    do
+    {
+        
+        SET_RUCI_PARA_SET_2CH_SCAN_FREQUENCY(cmd_ptr, p_freq->scan_enable, p_freq->rf_freq1, p_freq->rf_freq2);
+        log_info_hexdump("cmd_ptr", cmd_ptr, RUCI_LEN_SET_2CH_SCAN_FREQUENCY);
+        RUCI_ENDIAN_CONVERT(cmd_ptr, RUCI_SET_2CH_SCAN_FREQUENCY);
+        log_info_hexdump("cmd_ptr_endian", cmd_ptr, RUCI_LEN_SET_2CH_SCAN_FREQUENCY);
+
+        while(hosal_rf_wrire_command(cmd_ptr, RUCI_LEN_SET_2CH_SCAN_FREQUENCY) != HOSAL_RF_STATUS_SUCCESS);
+        hosal_rf_read_event((uint8_t *)&sCnfEvent);
+        
+
+        RUCI_ENDIAN_CONVERT((uint8_t *)&sCnfEvent, RUCI_CNF_EVENT);
+        if (sCnfEvent.pci_cmd_subheader != RUCI_CODE_SET_2CH_SCAN_FREQUENCY)
+        {
+            rval = HOSAL_RF_STATUS_CONTENT_ERROR;
+            break;
+        }
+        if (sCnfEvent.status != HOSAL_RF_STATUS_SUCCESS)
+        {
+            rval = sCnfEvent.status;
+            break;
+        }        
+
+    } while (0);
+    
+    return rval;    
+}
 static hosal_rf_status_t __rf_15p4_src_match_set(uint32_t enable)
 {
     hosal_rf_status_t rval = HOSAL_RF_STATUS_SUCCESS;
@@ -1434,6 +1508,36 @@ static hosal_rf_status_t __rf_sub_fsk_filter_set(uint32_t filter)
 
     return rval;
 }
+static hosal_rf_status_t __rf_15p4_rx_pkt_channel_get(hosal_rf_15p4_rx_pkt_channel_t *rx)
+{
+    hosal_rf_status_t rval = HOSAL_RF_STATUS_SUCCESS;
+    uint8_t channel_tmp;
+    uint32_t temp_data;
+    uint8_t page;
+    uint16_t q_addr;    
+
+    /* get address of 2nd page in local data q */
+    RfMcu_MemoryGet(0x04038, (uint8_t *)&temp_data, 4);
+    page = (uint8_t)((temp_data >> 8) & 0xff) + 1;
+
+    /* Start from 0x4000 + (page*64), the 9th 4-byte*/
+    if (rx->rx_cnt < 4)
+    {
+        q_addr = 0x4000 + (page * 64) + (9 * 4);
+        RfMcu_MemoryGet(q_addr, (uint8_t *)&temp_data, 4);
+        channel_tmp = (temp_data >> (8 * rx->rx_cnt))& 0xff;
+    }
+    else
+    {
+        q_addr = 0x4000 + (page * 64) + (10 * 4);
+        RfMcu_MemoryGet(q_addr, (uint8_t *)&temp_data, 4);
+        channel_tmp = temp_data & 0xff;
+    }
+
+    rx->channel = channel_tmp;
+
+    return rval;
+}
 
 static hosal_rf_status_t __rf_15p4_op_pan_idx_set(uint32_t pan_idx)
 {
@@ -1463,19 +1567,22 @@ int hosal_rf_wrire_command(uint8_t *command_ptr, uint32_t command_len)
     int rval = HOSAL_RF_STATUS_SUCCESS;
     do
     {
-        if(g_take_taskHandle != NULL)
-        {
-            xSemaphoreTake(xSemaphore, portMAX_DELAY);
-        }
-        g_take_taskHandle = xTaskGetCurrentTaskHandle();
+        // if(g_take_taskHandle != NULL)
+        // {
+        //     xSemaphoreTake(xSemaphore, portMAX_DELAY);
+        // }
+        // g_take_taskHandle = xTaskGetCurrentTaskHandle();
+
+        xSemaphoreTake(xSemaphore, portMAX_DELAY);
         RfMcu_HostWakeUpMcu();
         if (RfMcu_PowerStateCheck() != 0x03)
         {
-            if(g_take_taskHandle != NULL)
-            {
-                xSemaphoreGive(xSemaphore);
-                g_take_taskHandle = NULL;
-            }
+            // if(g_take_taskHandle != NULL)
+            // {
+            //     xSemaphoreGive(xSemaphore);
+            //     g_take_taskHandle = NULL;
+            // }
+            xSemaphoreGive(xSemaphore);
             log_error("RF status invalid");
             rval = HOSAL_RF_STATUS_INVALID_STATE;
             taskYIELD();
@@ -1484,11 +1591,12 @@ int hosal_rf_wrire_command(uint8_t *command_ptr, uint32_t command_len)
 
         if (RF_MCU_TX_CMDQ_SET_SUCCESS != RfMcu_CmdQueueSend(command_ptr, (uint32_t)command_len))
         {
-            if(g_take_taskHandle != NULL)
-            {
-                xSemaphoreGive(xSemaphore);
-                g_take_taskHandle = NULL;
-            }
+            // if(g_take_taskHandle != NULL)
+            // {
+            //     xSemaphoreGive(xSemaphore);
+            //     g_take_taskHandle = NULL;
+            // }
+            xSemaphoreGive(xSemaphore);
             rval = HOSAL_RF_STATUS_NO_MEMORY;
             log_error("Command queue is full");
 
@@ -1584,7 +1692,7 @@ hosal_rf_status_t hosal_rf_ioctl(hosal_rf_ioctl_t ctl, void *p_arg)
 {
     hosal_rf_status_t rval = HOSAL_RF_STATUS_SUCCESS;
 
-    //log_info("%s _rf_ioctl %d %d", pcTaskGetName(NULL), ctl, p_arg);
+    log_debug("%s _rf_ioctl(%d):%s val:%d", pcTaskGetName(NULL), ctl, g_rf_ctl_name_tbl[ctl], p_arg);
 
     switch (ctl)
     {
@@ -1672,6 +1780,14 @@ hosal_rf_status_t hosal_rf_ioctl(hosal_rf_ioctl_t ctl, void *p_arg)
             rval = __rf_15p4_src_match_extend_entry((hosal_rf_15p4_src_match_t* ) p_arg);
         break;
 
+        case HOSAL_RF_IOCTL_15P4_2CH_SCAN_FREQUENCY_SET:
+            rval = __rf_15p4_2ch_scan_frequency_set((hosal_rf_15p4_2ch_scan_frequency_t *) p_arg);
+        break;
+
+        case HOSAL_RF_IOCTL_15P4_RX_DATA_CHANNEL_GET:
+            rval = __rf_15p4_rx_pkt_channel_get((hosal_rf_15p4_rx_pkt_channel_t *) p_arg);
+        break;
+
         case HOSAL_RF_IOCTL_SUBG_OQPSK_DATA_RATE_SET:
             rval = __rf_sub_qpsk_data_rate_set((hosal_rf_phy_data_rate_t) p_arg);
         break;
@@ -1713,9 +1829,7 @@ hosal_rf_status_t hosal_rf_ioctl(hosal_rf_ioctl_t ctl, void *p_arg)
         break;
     }
     if(rval != HOSAL_RF_STATUS_SUCCESS)
-    {
-        log_error("RF IOCTL(%d) fail %d", ctl, rval);
-    }
+        log_error("RF IOCTL(%d) fail %d", ctl, rval);    
     return rval;
 }
 
@@ -1747,12 +1861,15 @@ void hosal_rf_init(hosal_rf_mode_t mode)
     if(rf_common_init_by_fw(mode, __rf_event_callback) != true)
     {
         log_error("init fw fail");
+        __disable_irq();
+        ASSERT();
     }
 #if (CONFIG_HOSAL_RF_DEBUG == 1)
     outp32(0x40800010, 0x77777777);
     outp32(0x4080003C, (inp32(0x4080003C) | 0x07000000));
 #endif
     xSemaphore = xSemaphoreCreateBinaryStatic( &xSemaphoreBuffer );
+    xSemaphoreGive(xSemaphore);
 
     if( xTaskCreate(__rf_proc,
             (char*)"rf",

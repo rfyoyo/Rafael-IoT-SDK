@@ -141,7 +141,7 @@ int hosal_uart_init(hosal_uart_dev_t *uart_dev)
         uart->LCR = cval;
 
         uart->MCR = 0;         /*Initial default modem control register.*/
-        uart->FCR = (FCR_TRIGGER_4 | FCR_CLEAR_RCVR | FCR_CLEAR_XMIT | FCR_FIFO_EN);
+        uart->FCR = (FCR_TRIGGER_8 | FCR_CLEAR_RCVR | FCR_CLEAR_XMIT | FCR_FIFO_EN);
         /*init native DMA architecture setting*/
         uart->xDMA_IER = 0;         /*disable xDMA interrupt*/
 
@@ -179,7 +179,7 @@ int hosal_uart_send(hosal_uart_dev_t *uart_dev, const void *data, uint32_t size)
     return i;
 }
 
-int hosal_uart_receive(hosal_uart_dev_t *uart_dev, void *data, uint32_t expect_size)
+int __reloc hosal_uart_receive(hosal_uart_dev_t *uart_dev, void *data, uint32_t expect_size)
 {
     uint32_t counter = 0;
     hosal_uart_config_t *cfg = &uart_dev->config;
@@ -363,18 +363,24 @@ static void __uart_generic_notify_handler(uint8_t id)
     uint32_t  iir;
     
     iir   = uart->IIR & IIR_INTID_MSK;
-    if ((iir & IIR_INTSTATUS) == 0)
+    //if ((iir & IIR_INTSTATUS) == 0)
+    if ((iir == IIR_INTID_RDA) || (iir == IIR_INTID_CTI))
     {
         if (uart->LSR & UART_LSR_DR)
         {
             if(g_uart_handle[id].rx_cb != NULL)                
                 g_uart_handle[id].rx_cb(g_uart_handle[id].rx_cb_arg);
         }
+    
+    }
+
+    if(iir == IIR_INTID_THRE)
+    {
         if (uart->LSR & UART_LSR_THRE)
         {
             if(g_uart_handle[id].tx_cb != NULL)
                 g_uart_handle[id].tx_cb(g_uart_handle[id].tx_cb_arg);
-        }             
+        }         
     }
 
     if ((uart->xDMA_INT_STATUS & xDMA_ISR_TX) == xDMA_ISR_TX)

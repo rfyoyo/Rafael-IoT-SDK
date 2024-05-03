@@ -72,6 +72,8 @@ typedef enum
     HOSAL_RF_IOCTL_15P4_CSL_RECEIVER_CTRL_SET,
 
     HOSAL_RF_IOCTL_15P4_OPERATION_PAN_IDX_SET,
+    HOSAL_RF_IOCTL_15P4_2CH_SCAN_FREQUENCY_SET,
+    HOSAL_RF_IOCTL_15P4_RX_DATA_CHANNEL_GET,
 
     HOSAL_RF_IOCTL_SUBG_OQPSK_DATA_RATE_SET,
     HOSAL_RF_IOCTL_SUBG_OQPSK_MAC_SET,
@@ -148,12 +150,24 @@ typedef struct
     uint8_t *ptime;
 } hosal_rf_15p4_ack_packet_t;
 
+typedef struct 
+{
+    uint8_t rx_cnt;
+    uint8_t channel;
+} hosal_rf_15p4_rx_pkt_channel_t;
 
 typedef struct 
 {
     uint32_t control_type;
     uint8_t *addr;
 } hosal_rf_15p4_src_match_t;
+
+typedef struct 
+{
+    uint8_t scan_enable; 
+    uint32_t rf_freq1;
+    uint32_t rf_freq2;
+} hosal_rf_15p4_2ch_scan_frequency_t;
 
 typedef struct
 {
